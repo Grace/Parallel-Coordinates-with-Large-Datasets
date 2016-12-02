@@ -1,0 +1,185 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <title>Progressive Rendering Parallel Coordinates to Visualize Large Datasets</title>
+  <!-- SlickGrid -->
+  <link rel="stylesheet" href="lib/slickgrid/slick.grid.css" type="text/css"/>
+  <link rel="stylesheet" href="lib/slickgrid/jquery-ui-1.8.16.custom.css" type="text/css"/>
+  <link rel="stylesheet" href="lib/slickgrid/examples.css" type="text/css"/>
+  <link rel="stylesheet" href="lib/slickgrid/slick.pager.css" type="text/css"/>
+  <script src="lib/slickgrid/lib/jquery-1.8.3.js"></script>
+  <script src="lib/slickgrid/lib/jquery-ui-1.8.16.custom.min.js"></script>
+  <script src="lib/slickgrid/lib/jquery.event.drag-2.3.0.js"></script>
+  <script src="lib/slickgrid/slick.core.js"></script>
+  <script src="lib/slickgrid/slick.grid.js"></script>
+  <script src="lib/slickgrid/slick.pager.js"></script>
+  <script src="lib/slickgrid/slick.dataview.js"></script>
+  <script src="lib/slickgrid/slick.formatters.js"></script>
+  <!-- End SlickGrid -->
+  <link rel="stylesheet" type="text/css" href="../d3.parcoords.css">
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <style>
+  body, html {
+    margin: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  #grid, #pager {
+    position: fixed;
+    width: 100%;
+  }
+  #grid {
+    bottom: 0;
+    height: 300px;
+  }
+  #pager {
+    bottom: 306px;
+    height: 20px;
+  }
+  .slick-row:hover {
+    font-weight: bold;
+    color: #069;
+  }
+
+  .cell-title {
+        font-weight: bold;
+      }
+      .cell-effort-driven {
+        text-align: center;
+      }
+      .cell-selection {
+        border-right-color: silver;
+        border-right-style: solid;
+        background: #f5f5f5;
+        color: gray;
+        text-align: right;
+        font-size: 10px;
+      }
+  </style>
+</head>
+<body>
+<script src="lib/d3.min.js"></script>
+<script src="../d3.parcoords.js"></script>
+<script src="lib/divgrid.js"></script>
+<div id="example" class="parcoords" style="height:300px;"></div>
+<div id="grid"></div>
+<div id="pager"></div>
+
+<script>
+// Init Parallel Coordinates chart
+var parcoords = d3.parcoords()("#example")
+    .alpha(0.1)
+    .mode("queue") // progressive rendering
+    .height(d3.max([document.body.clientHeight-326, 220]))
+    .margin({
+      top: 36,
+      left: 0,
+      right: 0,
+      bottom: 16
+    });
+
+
+  var dataView;
+  var grid;
+  var data = [];
+  // var columns = [
+  //   {id: "name", name: "Name", field: "name", width: 120, minWidth: 120, cssClass: "cell-title"},
+  //   {id: "group", name: "Group", field: "group"},
+  //   {id: "protein", name: "protein", field: "protein"},
+  //   {id: "calcium", name: "calcium", field: "calcium"},
+  //   {id: "fiber", name: "fiber", field: "fiber"},
+  //   {id: "vitaminc", name: "vitaminc", field: "vitaminc"},
+  //   {id: "potassium", name: "potassium", field: "potassium"},
+  //   {id: "carbohydrates", name: "carbohydrates", field: "carbohydrates"},
+  //   {id: "sugars", name: "sugars", field: "sugars"},
+  //   {id: "fat", name: "fat", field: "fat"},
+  //   {id: "water", name: "water", field: "water"},
+  //   {id: "calories", name: "calories", field: "calories"},
+  //   {id: "saturated", name: "saturated", field: "saturated"},
+  //   {id: "monounsat", name: "monounsat", field: "monounsat"},
+  //   {id: "polyunsat", name: "polyunsat", field: "polyunsat"}];
+
+  var options = {
+    editable: false,
+    enableAddRow: false,
+    enableCellNavigation: true
+  };
+
+  var percentCompleteThreshold = 0;
+  var prevPercentCompleteThreshold = 0;
+  var h_runfilters = null;
+
+  function DataItem(i) {
+    // slickgrid needs each data element to have an id
+    this.id = i;
+    this.name = "name_" + i;
+    this.group = "group_" + (i % 5);
+    this.protein = Math.round(Math.random() * 100);
+    this.calcium = Math.round(Math.random() * 50);
+    this.sodium = Math.round(Math.random() * 200);
+    this.fiber = Math.round(Math.random() * 50);
+    this.vitaminc = Math.round(Math.random() * 100);
+    this.potassium = Math.round(Math.random() * 100);
+    this.carbohydrates = Math.round(Math.random() * 500);
+    this.sugar = Math.round(Math.random() * 100);
+    this.fat = Math.round(Math.random() * 50);
+    this.water = Math.round(Math.random() * 100);
+    this.calories = Math.round(Math.random() * 1000);
+    this.saturated = Math.round(Math.random() * 100);
+    this.monounsat = Math.round(Math.random() * 100);
+    this.polyunsat = Math.round(Math.random() * 100);
+  }
+
+// Test data
+  $(function () {
+    // prepare the data
+    for (var i = 0; i < 30000; i++) {
+      data[i] = new DataItem(i);
+    }
+
+    // setting up grid
+    var column_keys = d3.keys(data[0]);
+    var columns = column_keys.map(function(key,i) {
+      return {
+        id: key,
+        name: key,
+        field: key,
+        sortable: true
+      }
+    });
+
+    dataView = new Slick.Data.DataView({ inlineFilters: true });
+    grid = new Slick.Grid("#grid", dataView, columns, options);
+    var pager = new Slick.Controls.Pager(dataView, grid, $("#pager"));
+
+    // wire up model events to drive the grid
+    dataView.onRowCountChanged.subscribe(function (e, args) {
+      grid.updateRowCount();
+      grid.render();
+    });
+
+    dataView.onRowsChanged.subscribe(function (e, args) {
+      grid.invalidateRows(args.rows);
+      grid.render();
+    });
+
+    // initialize the model after all the events have been hooked up
+    dataView.beginUpdate();
+    dataView.setItems(data);
+    dataView.endUpdate();
+
+    // Feed data to Parallel Coordinates chart
+    parcoords
+    .data(data)
+    .hideAxis(["name", "group", "num"])
+    .render()
+    .reorderable()
+    .brushMode("1D-axes");
+
+
+  })
+</script>
+
+</body>
